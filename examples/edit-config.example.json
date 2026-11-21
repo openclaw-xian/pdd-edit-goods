@@ -1,0 +1,10 @@
+{
+  "recordRoot": "D:/pdd-edit-goods",
+  "saveMode": "fill",
+  "confirmSubmit": false,
+  "shops": [
+    { "shop": "<店铺A>", "profile": "<profile-A>", "goodsId": "<goods_id>" }
+  ],
+  "pricePercent": 10,
+  "stockSet": 10000
+}
