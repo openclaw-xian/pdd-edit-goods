@@ -30,7 +30,20 @@ description: 拼多多多店铺「商品编辑」：在商品编辑页批量换�
    - 新标签：`goods_add/index?id=<commitId>&goods_id=<gid>&type=edit`
 4. 编辑页底部有 `提交` / `保存草稿`；默认都不点。
 
-## 换图（操作手册，详细判据见 references/images.md）
+## 换图（自动执行 + 操作判据）
+
+```json
+"images": {
+  "carousel": ["D:/img/main-01.png", "D:/img/main-02.png"],
+  "detail": ["D:/img/detail-01.png", "D:/img/detail-02.png"],
+  "sku": [{ "match": "<规格编码>", "path": "D:/img/sku-01.png" }]
+}
+```
+
+- `carousel`：自动删到 0 → 上传新图；第一张即新首图
+- `detail`：自动留 1 张 → 上传新版 → 删开头旧图
+- `sku`：按规格编码匹配行 → 删旧预览 → 行内 input 上传
+- 图片默认不保存；saveMode 仍控制价格/库存的保存
 
 ### 轮播图（10 slot）
 
@@ -151,7 +164,9 @@ md 表：规格编码 / 原库存 / 改后库存 / 原拼单价 / 改后拼单�
 
 ## 测试边界
 
-- 换图：2026-11-07 旧 `pdd-edit-images` 实跑 1 个商品（12 SKU 预览图）验证过；完整判据在 `references/images.md`
-- 改价/库存 fill：72/72，约 145s；页面 720000 / 14.85～52.25，未保存
-- submit：live 提交成功，线上生效；restore 回原值 13.50～47.50 / 719928
-- 换图自动化执行层尚未写进 `worker-edit-goods.mjs`；当前按手册操作
+- 换图自动执行 2026-11-21 冒烟通过（全部未保存）：
+  - 轮播首图：10/10 → 删到 0 → 上传 2 → 2/10，第一张为新图
+  - 详情图：12/50 → 留 1 → 上传 2 → 3 → 删开头旧图 → 2
+  - SKU 预览：首行删旧 → 行内上传 → background-image 恢复
+- 改价/库存 fill：72/72；submit live；restore 回原值 13.50～47.50 / 719928
+- 已知：`run.mjs` 的 ego 子进程启动在当前环境有卡住记录；直接 worker 已验证可用

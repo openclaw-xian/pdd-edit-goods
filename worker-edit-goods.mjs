@@ -161,9 +161,181 @@ async function clickSave(label) {
   return { ok: /goods_add\/success/.test(url), url, confirm: confirm ? confirm.text : null };
 }
 
+async function carouselState() {
+  return page.evaluate(() => {
+    const car = document.querySelector(".goods-basic-line.carouse");
+    if (!car) return { found: false };
+    const t = (car.innerText || "");
+    const m = t.match(/已上传\s*(\d+)\/10/);
+    return { found: true, uploaded: m ? Number(m[1]) : null, imgs: car.querySelectorAll("img").length, files: car.querySelectorAll('input[type=file]').length };
+  });
+}
+
+async function replaceCarousel(files) {
+  for (const f of files) await fs.access(f).catch(() => { throw new Error("image_missing:" + f); });
+  let st = await carouselState();
+  if (!st.found) throw new Error("carousel_not_found");
+  log("carousel_before", JSON.stringify(st));
+  for (let i = 0; i < 15 && st.uploaded > 1; i++) {
+    const hit = await page.evaluate(() => {
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const car=document.querySelector(".goods-basic-line.carouse");
+      const imgs=[...car.querySelectorAll("img")].filter(vis);
+      const slot=imgs[imgs.length-1] ? imgs[imgs.length-1].closest('[class*="MaterialModalButton"]') : null;
+      if(!slot)return null;
+      const r=slot.getBoundingClientRect();
+      return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+    });
+    if (!hit) break;
+    await page.mouse.move(hit.x, hit.y); await page.waitForTimeout(350);
+    const del = await page.evaluate(() => {
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const car=document.querySelector(".goods-basic-line.carouse");
+      const ds=[...car.querySelectorAll('[class*="DeleteIcon"]')].filter(vis);
+      const d=ds[ds.length-1]; if(!d)return null;
+      const r=d.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+    });
+    if (!del) break;
+    await page.mouse.click(del.x, del.y);
+    await page.waitForTimeout(900);
+    st = await carouselState();
+    log("carousel_delete", JSON.stringify(st));
+  }
+  const input = await page.evaluate(() => {
+    const car=document.querySelector(".goods-basic-line.carouse");
+    const inp=[...car.querySelectorAll('input[type=file]')][0];
+    if(!inp)return false; inp.setAttribute("id","carousel-upload-auto"); return true;
+  });
+  if (!input) throw new Error("carousel_upload_input_not_found");
+  await page.setInputFiles("#carousel-upload-auto", files);
+  await page.waitForTimeout(2500);
+  st = await carouselState();
+  log("carousel_after", JSON.stringify(st));
+  if (st.uploaded === null || st.uploaded < 1 + files.length) throw new Error("carousel_upload_count_mismatch:" + JSON.stringify(st));
+  return { before: null, after: st, keptFirst: true, uploaded: files.length };
+}
+
+async function detailState() {
+  return page.evaluate(() => {
+    const groups=[...document.querySelectorAll(".mui-form-group")];
+    const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
+    if(!g)return {found:false};
+    const t=(g.innerText||"");
+    const m=t.match(/已上传\s*(\d+)\/50/);
+    return {found:true,uploaded:m?Number(m[1]):null,imgs:g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]').length, files:g.querySelectorAll('input[type=file]').length};
+  });
+}
+
+async function replaceDetail(files) {
+  for (const f of files) await fs.access(f).catch(() => { throw new Error("image_missing:" + f); });
+  let st = await detailState();
+  if (!st.found) throw new Error("detail_not_found");
+  log("detail_before", JSON.stringify(st));
+  for (let i=0;i<12 && st.uploaded>1;i++) {
+    const hit = await page.evaluate(() => {
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const groups=[...document.querySelectorAll(".mui-form-group")];
+      const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
+      if(!g)return null;
+      const imgs=[...g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]')].filter(vis);
+      const slot=imgs[imgs.length-1]; if(!slot)return null; slot.scrollIntoView({block:"center"});
+      const r=slot.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+    });
+    if(!hit) break;
+    await page.mouse.move(hit.x,hit.y); await page.waitForTimeout(350);
+    const del=await page.evaluate(()=>{
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const groups=[...document.querySelectorAll(".mui-form-group")];
+      const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
+      if(!g)return null;
+      const ds=[...g.querySelectorAll('[class*="DeleteIcon"]')].filter(vis); const d=ds[ds.length-1]; if(!d)return null;
+      const r=d.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+    });
+    if(!del) break; await page.mouse.click(del.x,del.y); await page.waitForTimeout(800);
+    st=await detailState(); log("detail_delete",JSON.stringify(st));
+  }
+  const input=await page.evaluate(()=>{
+    const groups=[...document.querySelectorAll(".mui-form-group")];
+    const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
+    const inp=g?[...g.querySelectorAll('input[type=file]')][0]:null; if(!inp)return false; inp.setAttribute("id","detail-upload-auto");return true;
+  });
+  if(!input) throw new Error("detail_upload_input_not_found");
+  await page.setInputFiles("#detail-upload-auto", files);
+  await page.waitForTimeout(2500);
+  st=await detailState(); log("detail_after_upload",JSON.stringify(st));
+  // delete first old image (keep first was old)
+  const delFirst=await page.evaluate(()=>{
+    const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+    const groups=[...document.querySelectorAll(".mui-form-group")];
+    const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
+    if(!g)return null; const imgs=[...g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]')].filter(vis); const slot=imgs[0]; if(!slot)return null; slot.scrollIntoView({block:"center"});
+    const r=slot.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+  });
+  if(delFirst){
+    await page.mouse.move(delFirst.x,delFirst.y); await page.waitForTimeout(350);
+    const d=await page.evaluate(()=>{const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};const groups=[...document.querySelectorAll(".mui-form-group")];const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));const ds=[...g.querySelectorAll('[class*="DeleteIcon"]')].filter(vis);const d=ds[0];if(!d)return null;const r=d.getBoundingClientRect();return{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};});
+    if(d){await page.mouse.click(d.x,d.y); await page.waitForTimeout(800);}
+  }
+  st=await detailState(); log("detail_final",JSON.stringify(st));
+  return {after:st, uploaded:files.length};
+}
+async function replaceSkuPreviews(items) {
+  const out = [];
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    if (!item || !item.match || !item.path) throw new Error("sku_item_invalid:" + JSON.stringify(item));
+    await fs.access(item.path).catch(() => { throw new Error("image_missing:" + item.path); });
+    const cell = await page.evaluate((match) => {
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const tr=[...document.querySelectorAll("tbody tr")].find(r=>[...r.querySelectorAll("input")].some(i=>String(i.value||"").includes(match)));
+      const c=tr?tr.querySelector("td.sku-preview-cell"):null;
+      if(!c)return null; c.scrollIntoView({block:"center"});
+      const r=c.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+    }, item.match);
+    if (!cell) { out.push({ match: item.match, ok: false, why: "row_or_cell_not_found" }); continue; }
+    await page.mouse.move(cell.x, cell.y); await page.waitForTimeout(400);
+    const del = await page.evaluate((match) => {
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const tr=[...document.querySelectorAll("tbody tr")].find(r=>[...r.querySelectorAll("input")].some(i=>String(i.value||"").includes(match)));
+      const c=tr?tr.querySelector("td.sku-preview-cell"):null; if(!c)return null;
+      const ds=[...c.querySelectorAll('[class*="DeleteIcon"]')].filter(vis); const d=ds[0]; if(!d)return null;
+      const r=d.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
+    }, item.match);
+    if (del) { await page.mouse.click(del.x, del.y); await page.waitForTimeout(900); }
+    const input = await page.evaluate((match) => {
+      const tr=[...document.querySelectorAll("tbody tr")].find(r=>[...r.querySelectorAll("input")].some(i=>String(i.value||"").includes(match)));
+      const c=tr?tr.querySelector("td.sku-preview-cell"):null; const i=c?c.querySelector('input[type=file]'):null;
+      if(!i)return false; i.setAttribute("id","sku-preview-auto-"+Math.floor(Math.random()*100000)); return i.id;
+    }, item.match);
+    if (!input) { out.push({ match: item.match, ok: false, why: "upload_input_not_found" }); continue; }
+    await page.setInputFiles("#" + input, item.path);
+    await page.waitForTimeout(2200);
+    const after = await page.evaluate((match) => {
+      const tr=[...document.querySelectorAll("tbody tr")].find(r=>[...r.querySelectorAll("input")].some(i=>String(i.value||"").includes(match)));
+      const c=tr?tr.querySelector("td.sku-preview-cell"):null;
+      return { ok: !!c && !!c.querySelector('[style*="background-image"]'), text: c ? (c.innerText||"").slice(0,40) : "" };
+    }, item.match);
+    out.push({ match: item.match, ok: after.ok, after });
+  }
+  return out;
+}
 async function main() {
   await openEdit();
-  const changed = await fillAll();
+  let changed = [];
+  const hasPrice = JOB.pricePercent !== undefined && JOB.pricePercent !== null && Number.isFinite(Number(JOB.pricePercent));
+  const hasStock = JOB.stockSet !== undefined && JOB.stockSet !== null;
+  if (hasPrice || hasStock) changed = await fillAll();
+  let imagesResult = null;
+  const images = JOB.images || {};
+  if (Array.isArray(images.carousel) && images.carousel.length) {
+    imagesResult = { ...(imagesResult || {}), carousel: await replaceCarousel(images.carousel) };
+  }
+  if (Array.isArray(images.detail) && images.detail.length) {
+    imagesResult = { ...(imagesResult || {}), detail: await replaceDetail(images.detail) };
+  }
+  if (Array.isArray(images.sku) && images.sku.length) {
+    imagesResult = { ...(imagesResult || {}), sku: await replaceSkuPreviews(images.sku) };
+  }
   const summary = await page.evaluate(() => {
     const t=document.body.innerText||"";
     const m=t.match(/总库存\s*([0-9]+)/);
@@ -183,11 +355,11 @@ async function main() {
     "# 商品编辑 · " + JOB.shop + " · " + today(),
     "", "| 规格编码 | 原库存 | 改后库存 | 原拼单价 | 改后拼单价 | 原单买价 | 改后单买价 |", "|---|---|---|---|---|---|---|",
     ...changed.map(c=>"| "+c.code+" | "+c.oldStock+" | "+c.nextStock+" | "+c.oldPrice+" | "+c.nextPrice+" | "+c.oldSingle+" | "+c.nextSingle+" |"),
-    "", "## 汇总", "- 商品ID：" + JOB.goodsId, "- 改价百分比：" + (Number.isFinite(Number(JOB.pricePercent))?JOB.pricePercent:"-"), "- 库存设为：" + (JOB.stockSet===undefined?"-":JOB.stockSet), "- 修改规格数：" + changed.length, "- 页面总库存：" + (summary.totalStock||"-"), "- 页面价格：" + (summary.priceRange||"-"), "- 保存模式：" + mode, "- 保存结果：" + (saved ? (saved.ok ? "success" : "failed") + " " + (saved.url || "") : "未保存"), "",
+    "", "## 图片", imagesResult ? JSON.stringify(imagesResult) : "-", "", "## 汇总", "- 商品ID：" + JOB.goodsId, "- 改价百分比：" + (Number.isFinite(Number(JOB.pricePercent))?JOB.pricePercent:"-"), "- 库存设为：" + (JOB.stockSet===undefined?"-":JOB.stockSet), "- 修改规格数：" + changed.length, "- 页面总库存：" + (summary.totalStock||"-"), "- 页面价格：" + (summary.priceRange||"-"), "- 保存模式：" + mode, "- 保存结果：" + (saved ? (saved.ok ? "success" : "failed") + " " + (saved.url || "") : "未保存"), "",
     "> 默认只填不保存；提交/保存需显式 saveMode。",
   ];
   await fs.appendFile(mdPath, (await fs.access(mdPath).then(()=>"\n\n---\n\n## 运行 "+localStamp()+"\n\n").catch(()=>"")) + lines.join("\n"), "utf8");
-  return { status: mode === "submit" && saved && !saved.ok ? "failed" : "done", mode, record: mdPath, changed, summary, saved };
+  return { status: mode === "submit" && saved && !saved.ok ? "failed" : "done", mode, record: mdPath, changed, summary, saved, images: imagesResult };
 }
 let result;
 try { result = await main(); await writeResult({ ok: true, ...result }); }

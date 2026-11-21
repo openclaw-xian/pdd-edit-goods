@@ -23,7 +23,12 @@ node run.mjs edit-config.json
     { "shop": "<店铺A>", "profile": "<profile-A>", "goodsId": "<goods_id>" }
   ],
   "pricePercent": 10,
-  "stockSet": 10000
+  "stockSet": 10000,
+  "images": {
+    "carousel": ["D:/img/main-01.png", "D:/img/main-02.png"],
+    "detail": ["D:/img/detail-01.png", "D:/img/detail-02.png"],
+    "sku": [{ "match": "<规格编码>", "path": "D:/img/sku-01.png" }]
+  }
 }
 ```
 

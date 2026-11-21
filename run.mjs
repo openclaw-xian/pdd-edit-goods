@@ -21,13 +21,14 @@ const RUNTIME = path.join(os.tmpdir(), "pdd-edit-goods-runtime", RUN_ID);
 const saveMode = String(CFG.saveMode || "fill");
 const pricePercent = CFG.pricePercent === undefined ? null : Number(CFG.pricePercent);
 const stockSet = CFG.stockSet === undefined ? null : Number(CFG.stockSet);
+const images = CFG.images || {};
 const shops = (CFG.shops || []).map((s) => typeof s === "string" ? { shop: s } : s).filter((s) => s && s.shop);
 const issues = [];
 const addIssue = (code, q) => issues.push({ code, question: q });
 
 if (!shops.length) addIssue("shops_missing", "config 需要 shops");
 if (!["fill", "draft", "submit"].includes(saveMode)) addIssue("saveMode_invalid", "saveMode 只能是 fill/draft/submit");
-if (pricePercent === null && stockSet === null) addIssue("action_missing", "需要 pricePercent 或 stockSet");
+if (pricePercent === null && stockSet === null && !Array.isArray(images.carousel) && !Array.isArray(images.detail) && !Array.isArray(images.sku)) addIssue("action_missing", "需要 pricePercent/stockSet 或 images.carousel/detail");
 if ((pricePercent !== null && !Number.isFinite(pricePercent)) || (stockSet !== null && !Number.isFinite(stockSet))) addIssue("value_invalid", "pricePercent/stockSet 必须是数字");
 if (saveMode === "submit" && CFG.confirmSubmit !== true) addIssue("submit_not_confirmed", "submit 生效需显式 confirmSubmit:true；先用 fill 检查");
 if (!shops.some((s) => s.goodsId || CFG.goodsId)) addIssue("goods_missing", "需要 goodsId（全局或每个 shop）");
@@ -43,7 +44,7 @@ async function runOne(store, i) {
   const goodsId = String(store.goodsId || CFG.goodsId || "");
   const job = {
     shop: store.shop, profile: store.profile || null, goodsId,
-    pricePercent, stockSet, saveMode,
+    pricePercent, stockSet, saveMode, images,
     recordRoot: RECORD_ROOT,
     resultPath: path.join(RESULT_DIR, store.shop + ".json"),
     logPath: path.join(LOG_DIR, store.shop + ".log"),
@@ -51,13 +52,16 @@ async function runOne(store, i) {
   const wrapper = path.join(RUNTIME, "job-" + i + ".mjs");
   await fs.writeFile(wrapper, "globalThis.__JOB = " + JSON.stringify(job) + ";\nawait import('file:///" + WORKER + "');\n", "utf8");
   const started = Date.now();
-  const child = spawn(EGO, ["nodejs", "-e", "await import('file:///" + wrapper + "')"], { stdio: "ignore", windowsHide: true });
-  const timer = setTimeout(() => { try { child.kill(); } catch (e) {} }, Number(CFG.jobTimeoutSec || 600) * 1000);
-  await new Promise((res) => child.on("exit", res));
-  clearTimeout(timer);
+  const psCmd = "& '" + EGO + "' nodejs -e \"await import('file:///" + wrapper + "')\"";
+  const child = spawn("powershell.exe", ["-NoProfile", "-Command", psCmd], { stdio: "inherit", windowsHide: true });
+  child.on("error", (e) => { try { console.error("SPAWN_ERROR=" + e.message); } catch (_) {} });
   let result = null;
-  for (let k = 0; k < 360 && !result; k++) { try { result = JSON.parse(await fs.readFile(job.resultPath, "utf8")); } catch (e) { await sleep(500); } }
+  const deadline = started + Number(CFG.jobTimeoutSec || 600) * 1000;
+  while (!result && Date.now() < deadline) {
+    try { result = JSON.parse(await fs.readFile(job.resultPath, "utf8")); } catch (e) { await sleep(500); }
+  }
   if (!result) result = { ok: false, status: "failed", error: "no_result_file" };
+  try { if (!child.killed) child.kill(); } catch (e) {}
   return { shop: store.shop, goodsId, result, wallSec: Number(((Date.now() - started) / 1000).toFixed(1)) };
 }
 
