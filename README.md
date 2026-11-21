@@ -1,12 +1,12 @@
 # pdd-edit-goods
 
-拼多多多店铺「商品编辑」—— 编辑页批量改价/库存。默认只填不保存，检查后再显式提交。
+拼多多多店铺「商品编辑」—— 编辑页换图 + 改价/库存。
 
 ## 安全
 
-- `saveMode:"fill"` 默认，只填不保存
-- `saveMode:"submit"` 才提交，且需要 `confirmSubmit:true`
-- 一次只改一个商品；多店顺序
+- 默认只操作页面，不保存、不提交
+- 改价/库存 `saveMode:"fill"` 默认；`submit` 需双开关
+- 换图按 `references/images.md` 操作，默认不保存
 
 ## 用法
 
@@ -27,8 +27,16 @@ node run.mjs edit-config.json
 }
 ```
 
+## 能力
+
+- 换图：轮播图 / 详情图 / SKU 预览图（操作手册 + 图区判据见 references/images.md）
+- 改价：批量百分比改拼单价/单买价
+- 库存：批量设改后库存
+- CDP 滚动填值，覆盖多 SKU 虚拟表格
+- fill / draft / submit 三种保存模式
+
 ## 输出
 
 `<recordRoot>/<店铺>/pdd-edit-goods-<日期>.md` + `_runs/edit-goods-<时间>/report.json`
 
-详细字段/算法/坑见 [SKILL.md](SKILL.md)。
+详细规则/算法/坑见 [SKILL.md](SKILL.md)。

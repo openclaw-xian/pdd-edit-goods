@@ -24,8 +24,13 @@
 - 线上恢复 13.50～47.50 / 719928
 - 其中一个 SKU 曾停在 10000，发现后单独修正 + 再提交
 
+## 换图历史
+
+- 2026-11-07 旧 pdd-edit-images 实跑 1 个商品（12 SKU 预览图），判据与坑保留在 references/images.md。
+- 换图自动化执行层尚未写入 worker-edit-goods.mjs。
+
 ## 未测/边界
 
 - 草稿保存 live
 - 多店 submit live
-- 换图/标题（不在本 skill）
+- 换图自动化 live
