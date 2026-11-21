@@ -279,19 +279,69 @@ async function replaceDetail(files) {
   st=await detailState(); log("detail_final",JSON.stringify(st));
   return {after:st, uploaded:files.length};
 }
+async function collectSkuCodes() {
+  const FN = `async () => {
+    const sc=[...document.querySelectorAll("*")].filter(e=>e.querySelector&&e.querySelector("tbody tr")&&e.scrollHeight>e.clientHeight+30);
+    const all=[...new Set(sc)]; const maxSh=Math.max(3000,...all.map(e=>e.scrollHeight));
+    const seen=new Set();
+    const step=()=>{for(const tr of [...document.querySelectorAll("tbody tr")]){const ins=[...tr.querySelectorAll('input[placeholder="请输入"]')].filter(e=>e.offsetParent);if(ins.length<5)continue;const code=String(ins[4].value||"").trim();if(code)seen.add(code);}};
+    all.forEach(e=>e.scrollTop=0);window.scrollTo(0,0);await new Promise(r=>setTimeout(r,300));step();
+    for(let st=0;st<=maxSh+600;st+=140){all.forEach(e=>e.scrollTop=st);window.scrollTo(0,st);await new Promise(r=>setTimeout(r,80));step();}
+    return [...seen];
+  }`;
+  const res = await evalLong(FN, null, { timeoutMs: 240000 });
+  if (!res || res.__error) throw new Error("sku_collect_failed:" + (res && res.__error || "no_result"));
+  log("sku_codes", JSON.stringify({ count: res.length }));
+  return res;
+}
+
+async function replaceAllSkuPreviews(path) {
+  await fs.access(path).catch(() => { throw new Error("image_missing:" + path); });
+  const codes = await collectSkuCodes();
+  if (!codes.length) throw new Error("sku_none");
+  return replaceSkuPreviews(codes.map((match) => ({ match, path })));
+}
+async function findSkuCell(match) {
+  await page.evaluate(() => {
+    const vis=(x)=>{const r=x.getBoundingClientRect();return r.width>0&&r.height>0;};
+    const tables=[...document.querySelectorAll("table")].filter(vis).filter(x=>x.querySelectorAll("tbody tr").length>0);
+    const t=tables[0];
+    if(t){
+      const cands=[t,...(t.parentElement?[t.parentElement]:[]),...(t.parentElement&&t.parentElement.parentElement?[t.parentElement.parentElement]:[])].filter(x=>x.scrollHeight>x.clientHeight+20);
+      if(cands.length)cands[0].scrollTop=0;
+    }
+    window.scrollTo(0,0);
+  });
+  await page.waitForTimeout(400);
+  for (let step = 0; step < 80; step++) {
+    const hit = await page.evaluate((match) => {
+      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
+      const tr=[...document.querySelectorAll("tbody tr")].find(r=>[...r.querySelectorAll("input")].some(i=>String(i.value||"").includes(match)));
+      if (tr) {
+        const c=tr.querySelector("td.sku-preview-cell");
+        if (c) { c.scrollIntoView({block:"center"}); const r=c.getBoundingClientRect(); return {found:true,x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; }
+      }
+      const tables=[...document.querySelectorAll("table")].filter(vis).filter(x=>x.querySelectorAll("tbody tr").length>0);
+      const t=tables[0];
+      if (t) {
+        const cands=[t,...(t.parentElement?[t.parentElement]:[]),...(t.parentElement&&t.parentElement.parentElement?[t.parentElement.parentElement]:[])].filter(x=>x.scrollHeight>x.clientHeight+20);
+        if (cands.length) { cands[0].scrollTop += 300; return {found:false,scrolled:true}; }
+      }
+      return {found:false,scrolled:false};
+    }, match);
+    if (hit && hit.found) return hit;
+    if (!hit || !hit.scrolled) return null;
+    await page.waitForTimeout(250);
+  }
+  return null;
+}
 async function replaceSkuPreviews(items) {
   const out = [];
   for (let idx = 0; idx < items.length; idx++) {
     const item = items[idx];
     if (!item || !item.match || !item.path) throw new Error("sku_item_invalid:" + JSON.stringify(item));
     await fs.access(item.path).catch(() => { throw new Error("image_missing:" + item.path); });
-    const cell = await page.evaluate((match) => {
-      const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
-      const tr=[...document.querySelectorAll("tbody tr")].find(r=>[...r.querySelectorAll("input")].some(i=>String(i.value||"").includes(match)));
-      const c=tr?tr.querySelector("td.sku-preview-cell"):null;
-      if(!c)return null; c.scrollIntoView({block:"center"});
-      const r=c.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
-    }, item.match);
+    const cell = await findSkuCell(item.match);
     if (!cell) { out.push({ match: item.match, ok: false, why: "row_or_cell_not_found" }); continue; }
     await page.mouse.move(cell.x, cell.y); await page.waitForTimeout(400);
     const del = await page.evaluate((match) => {
@@ -335,6 +385,9 @@ async function main() {
   }
   if (Array.isArray(images.sku) && images.sku.length) {
     imagesResult = { ...(imagesResult || {}), sku: await replaceSkuPreviews(images.sku) };
+  }
+  if (typeof images.skuAll === "string" && images.skuAll) {
+    imagesResult = { ...(imagesResult || {}), skuAll: await replaceAllSkuPreviews(images.skuAll) };
   }
   const summary = await page.evaluate(() => {
     const t=document.body.innerText||"";
