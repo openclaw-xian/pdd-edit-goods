@@ -176,7 +176,7 @@ async function replaceCarousel(files) {
   let st = await carouselState();
   if (!st.found) throw new Error("carousel_not_found");
   log("carousel_before", JSON.stringify(st));
-  for (let i = 0; i < 15 && st.uploaded > 1; i++) {
+  for (let i = 0; i < 15 && st.uploaded > 0; i++) {
     const hit = await page.evaluate(() => {
       const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
       const car=document.querySelector(".goods-basic-line.carouse");
@@ -211,7 +211,7 @@ async function replaceCarousel(files) {
   await page.waitForTimeout(2500);
   st = await carouselState();
   log("carousel_after", JSON.stringify(st));
-  if (st.uploaded === null || st.uploaded < 1 + files.length) throw new Error("carousel_upload_count_mismatch:" + JSON.stringify(st));
+  if (st.uploaded === null || st.uploaded < files.length) throw new Error("carousel_upload_count_mismatch:" + JSON.stringify(st));
   return { before: null, after: st, keptFirst: true, uploaded: files.length };
 }
 
