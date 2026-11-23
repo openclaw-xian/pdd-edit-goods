@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 — 2026-11-23
+
+- 编辑前检测商品列表行：出现「新版本已驳回 / 审核不通过」立即停止，status=`needs`，exit 4，并带出原因。
+- 提交后检测商品列表：出现驳回标记 status=`rejected`。
+- 点击提交后无 success URL/无成功提示 status=`submit_failed`，exit 5。
+- 实测当前驳回商品：11.7s 检测到 `product_rejected_version`，未再点编辑/提交，线上不变。
 ## 0.2.9 — 2026-11-23
 
 - 提交后增加结果状态：`submitted` / `rejected` / `submit_failed`。

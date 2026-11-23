@@ -82,6 +82,8 @@ async function openEdit() {
   // filter ID
   await page.evaluate((gid) => { const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}; const labels=[...document.querySelectorAll("*")].filter(e=>vis(e)&&!e.children.length&&(e.textContent||"").trim()==="商品ID"); let inp=null; for(const lab of labels){let row=lab;for(let i=0;i<8&&row;i++){row=row.parentElement;if(!row)break;const c=[...row.querySelectorAll("input")].filter(x=>vis(x)&&x.type!=="checkbox"&&x.type!=="radio");if(c.length){inp=c[0];break;}}if(inp)break;} if(inp){const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value").set;s.call(inp,gid);inp.dispatchEvent(new Event("input",{bubbles:true}));inp.dispatchEvent(new Event("change",{bubbles:true}));inp.focus();} }, JOB.goodsId);
   await page.keyboard.press("Enter"); await page.waitForTimeout(2500);
+  const rowText = await page.evaluate((gid) => { const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}; const txt=(e)=>(e?(e.innerText||e.textContent||"").replace(/\s+/g," ").trim():""); const a=[...document.querySelectorAll("*")].find(e=>vis(e)&&!e.children.length&&txt(e).includes(gid)); if(!a)return ""; let n=a,row=null; for(let i=0;i<8&&n;i++){n=n.parentElement;if(!n)break;if(/销售中|已下架|审核中|发布中|已驳回/.test(txt(n))){row=n;break;}} return row?txt(row):""; }, JOB.goodsId);
+  if (/新版本已驳回|审核不通过|审核驳回/.test(rowText)) throw new Error("product_rejected_version:" + rowText.slice(-260));
   const editBtn = await page.evaluate((gid) => { const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}; const txt=(e)=>(e?(e.innerText||e.textContent||"").trim():""); const anchor=[...document.querySelectorAll("*")].find(e=>vis(e)&&!e.children.length&&txt(e).includes(gid)); if(!anchor)return null; let n=anchor,row=null; for(let i=0;i<8&&n;i++){n=n.parentElement;if(!n)break;if(/销售中|已下架/.test(txt(n))){row=n;break;}} if(!row)return null; const btn=[...row.querySelectorAll("*")].filter(e=>vis(e)&&!e.children.length&&txt(e)==="编辑")[0]; if(!btn)return null; const r=btn.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; }, JOB.goodsId);
   if (!editBtn) throw new Error("edit_button_not_found");
   const before = (await task.pages()).length;
@@ -529,7 +531,20 @@ async function main() {
 }
 let result;
 try { result = await main(); await writeResult({ ok: true, ...result }); }
-catch (e) { const msg = String(e.message || e); log("ERROR", msg); result = { status: "failed", error: msg }; await writeResult({ ok: false, ...result }); }
+catch (e) {
+  const msg = String(e.message || e);
+  log("ERROR", msg);
+  if (/product_rejected_version/.test(msg)) {
+    result = {
+      status: "needs",
+      error: msg,
+      needs: { code: "product_rejected_version", question: "商品存在「新版本已驳回」，未继续编辑。请先处理驳回版本/查看驳回原因，再重试。", detail: msg.slice(0, 500) },
+    };
+  } else {
+    result = { status: "failed", error: msg };
+  }
+  await writeResult({ ok: false, ...result });
+}
 finally {
   // 只填不保存：把手动控制留给用户检查
   try { if (task && (JOB.saveMode || "fill") === "fill") await task.handOff(); else if (task) await task.finish({ keep: [] }); } catch (e) {}

@@ -74,4 +74,5 @@ for (let i = 0; i < shops.length; i++) {
 const report = { runId: RUN_ID, saveMode, pricePercent, stockSet, recordRoot: RECORD_ROOT, stores: done.map((d) => ({ shop: d.shop, goodsId: d.goodsId, wallSec: d.wallSec, ...d.result })) };
 await fs.writeFile(path.join(RUN_DIR, "report.json"), JSON.stringify(report, null, 1), "utf8");
 console.log("REPORT=" + path.join(RUN_DIR, "report.json"));
-if (report.stores.some((s) => s.status === "failed")) process.exit(5);
+if (report.stores.some((s) => s.status === "failed" || s.status === "submit_failed")) process.exit(5);
+if (report.stores.some((s) => s.status === "needs" || s.needs)) process.exit(4);
