@@ -456,6 +456,22 @@ async function preflightImages() {
   log("image_preflight", JSON.stringify({ count: infos.length, carousel: carousel.length, detail: detail.length, sku: sku.length, skuAll: skuAll.length }));
   return infos;
 }
+async function verifyImageSubmitOutcome() {
+  const images = JOB.images || {};
+  const hasImages = (Array.isArray(images.carousel) && images.carousel.length) || (Array.isArray(images.detail) && images.detail.length) || (Array.isArray(images.sku) && images.sku.length) || (typeof images.skuAll === "string" && images.skuAll);
+  if (!hasImages) return { checked: false };
+  await page.goto("https://mms.pinduoduo.com/goods/goods_list", { timeout: 60000 });
+  await page.waitForTimeout(4500);
+  const tab = await page.evaluate(() => { const vis=(x)=>{const r=x.getBoundingClientRect();return r.width>0&&r.height>0;}; const txt=(x)=>(x?(x.textContent||"").trim():""); const t=[...document.querySelectorAll("*")].filter(x=>vis(x)&&!x.children.length&&/^在售中/.test(txt(x)))[0]; if(!t)return null; const r=t.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; });
+  if (tab) { await page.mouse.click(tab.x, tab.y); await page.waitForTimeout(2500); }
+  await page.evaluate((gid) => { const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}; const labels=[...document.querySelectorAll("*")].filter(e=>vis(e)&&!e.children.length&&(e.textContent||"").trim()==="商品ID"); let inp=null; for(const lab of labels){let row=lab;for(let i=0;i<8&&row;i++){row=row.parentElement;if(!row)break;const c=[...row.querySelectorAll("input")].filter(x=>vis(x)&&x.type!=="checkbox"&&x.type!=="radio");if(c.length){inp=c[0];break;}}if(inp)break;} if(inp){const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value").set;s.call(inp,gid);inp.dispatchEvent(new Event("input",{bubbles:true}));inp.dispatchEvent(new Event("change",{bubbles:true}));inp.focus();} }, JOB.goodsId);
+  await page.keyboard.press("Enter"); await page.waitForTimeout(2500);
+  const row = await page.evaluate((gid) => { const vis=(x)=>{const r=x.getBoundingClientRect();return r.width>0&&r.height>0;}; const txt=(x)=>(x?(x.innerText||x.textContent||"").replace(/\s+/g," ").trim():""); const a=[...document.querySelectorAll("*")].find(x=>vis(x)&&!x.children.length&&txt(x).includes(gid)); if(!a)return null; let n=a,r=null;for(let i=0;i<8&&n;i++){n=n.parentElement;if(!n)break;if(/销售中|已下架|审核中|发布中|已驳回/.test(txt(n))){r=n;break;}} return r?txt(r):""; }, JOB.goodsId);
+  const text = String(row || "");
+  log("submit_outcome_row", JSON.stringify({ rejected: /新版本已驳回|审核不通过|审核驳回/.test(text), auditing: /审核中|发布中/.test(text), sale: /销售中/.test(text) }));
+  return { checked: true, rejected: /新版本已驳回|审核不通过|审核驳回/.test(text), auditing: /审核中|发布中/.test(text), sale: /销售中/.test(text), rowText: text.slice(0, 500) };
+}
+
 async function main() {
   await preflightImages();
   await openEdit();
@@ -485,10 +501,19 @@ async function main() {
   });
   const mode = JOB.saveMode || "fill";
   let saved = null;
+  let submitOutcome = null;
+  let finalStatus = "done";
   if (mode !== "fill") {
     saved = await clickSave(mode === "submit" ? "提交" : "保存草稿");
     log("save_result", JSON.stringify(saved));
-    if (mode === "submit" && !saved.ok) throw new Error("submit_failed:" + (saved.url || "no_success"));
+    if (mode === "submit") {
+      if (!saved.ok) finalStatus = "submit_failed";
+      else {
+        submitOutcome = await verifyImageSubmitOutcome();
+        if (submitOutcome && submitOutcome.rejected) finalStatus = "rejected";
+        else finalStatus = "submitted";
+      }
+    }
   }
   await fs.mkdir(RECORD_DIR, { recursive: true }).catch(() => {});
   const mdPath = RECORD_DIR + "/pdd-edit-goods-" + today() + ".md";
@@ -496,11 +521,11 @@ async function main() {
     "# 商品编辑 · " + JOB.shop + " · " + today(),
     "", "| 规格编码 | 原库存 | 改后库存 | 原拼单价 | 改后拼单价 | 原单买价 | 改后单买价 |", "|---|---|---|---|---|---|---|",
     ...changed.map(c=>"| "+c.code+" | "+c.oldStock+" | "+c.nextStock+" | "+c.oldPrice+" | "+c.nextPrice+" | "+c.oldSingle+" | "+c.nextSingle+" |"),
-    "", "## 图片", imagesResult ? JSON.stringify(imagesResult) : "-", "", "## 汇总", "- 商品ID：" + JOB.goodsId, "- 改价百分比：" + (Number.isFinite(Number(JOB.pricePercent))?JOB.pricePercent:"-"), "- 库存设为：" + (JOB.stockSet===undefined?"-":JOB.stockSet), "- 修改规格数：" + changed.length, "- 页面总库存：" + (summary.totalStock||"-"), "- 页面价格：" + (summary.priceRange||"-"), "- 保存模式：" + mode, "- 保存结果：" + (saved ? (saved.ok ? "success" : "failed") + " " + (saved.url || "") : "未保存"), "",
+    "", "## 图片", imagesResult ? JSON.stringify(imagesResult) : "-", "", "## 汇总", "- 商品ID：" + JOB.goodsId, "- 改价百分比：" + (Number.isFinite(Number(JOB.pricePercent))?JOB.pricePercent:"-"), "- 库存设为：" + (JOB.stockSet===undefined?"-":JOB.stockSet), "- 修改规格数：" + changed.length, "- 页面总库存：" + (summary.totalStock||"-"), "- 页面价格：" + (summary.priceRange||"-"), "- 保存模式：" + mode, "- 状态：" + finalStatus, "- 保存结果：" + (saved ? (saved.ok ? "success" : "failed") + " " + (saved.url || "") : "未保存"), "- 提交后核验：" + (submitOutcome ? JSON.stringify(submitOutcome) : "-"), "",
     "> 默认只填不保存；提交/保存需显式 saveMode。",
   ];
   await fs.appendFile(mdPath, (await fs.access(mdPath).then(()=>"\n\n---\n\n## 运行 "+localStamp()+"\n\n").catch(()=>"")) + lines.join("\n"), "utf8");
-  return { status: mode === "submit" && saved && !saved.ok ? "failed" : "done", mode, record: mdPath, changed, summary, saved, images: imagesResult };
+  return { status: finalStatus, mode, record: mdPath, changed, summary, saved, submitOutcome, images: imagesResult };
 }
 let result;
 try { result = await main(); await writeResult({ ok: true, ...result }); }
