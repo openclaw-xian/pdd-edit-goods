@@ -53,9 +53,15 @@ async function openEdit() {
       page = await newPageSafe();
     } catch (e) {
       if (!/page_budget_full/.test(String(e.message || e))) throw e;
-      log("page_budget_recreate", String(e.message || e));
-      try { await task.finish({ keep: [] }); } catch (e2) {}
-      task = null; page = null;
+      log("page_budget_close_extra", String(e.message || e));
+      const oldPages = await task.pages().catch(() => []);
+      for (const p of oldPages) { try { await p.close(); } catch (e2) {} }
+      await sleep(600);
+      try { page = await newPageSafe(); } catch (e3) {
+        log("page_budget_recreate", String(e3.message || e3));
+        try { await task.finish({ keep: [] }); } catch (e4) {}
+        task = null; page = null;
+      }
     }
   }
   if (!page) {
@@ -186,8 +192,11 @@ async function clickSave(label) {
   });
   if (confirm) { await page.mouse.click(confirm.x, confirm.y); await page.waitForTimeout(3500); }
   await page.waitForTimeout(3000);
-  const url = String(await page.url());
-  return { ok: /goods_add\/success/.test(url), url, confirm: confirm ? confirm.text : null };
+  const state = await page.evaluate(() => ({ url: location.href, text: (document.body.innerText || "").slice(-1500) }));
+  const url = String(state.url);
+  const successUrl = /goods_add\/success/.test(url);
+  const successToast = /保存成功|草稿保存成功|保存草稿成功/.test(state.text);
+  return { ok: successUrl || successToast, url, confirm: confirm ? confirm.text : null, successUrl, successToast };
 }
 
 async function carouselState() {
@@ -398,7 +407,57 @@ async function replaceSkuPreviews(items) {
   }
   return out;
 }
+async function imageInfo(file) {
+  const st = await fs.stat(file).catch(() => null);
+  if (!st) throw new Error("image_missing:" + file);
+  if (st.size > 3 * 1024 * 1024) throw new Error("image_too_large:" + file + ":" + st.size);
+  const b = await fs.readFile(file);
+  const sig = b.slice(0, 8);
+  if (sig[0] === 0x89 && sig.toString("ascii", 1, 4) === "PNG") {
+    return { file, size: st.size, format: "png", width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+  }
+  if (b[0] === 0xFF && b[1] === 0xD8) {
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xFF) { i++; continue; }
+      const m = b[i + 1];
+      if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {
+        return { file, size: st.size, format: "jpeg", width: b.readUInt16BE(i + 7), height: b.readUInt16BE(i + 5) };
+      }
+      const len = b.readUInt16BE(i + 2);
+      i += 2 + len;
+    }
+    throw new Error("image_bad_jpeg:" + file);
+  }
+  throw new Error("image_format_unsupported:" + file);
+}
+
+async function preflightImages() {
+  const images = JOB.images || {};
+  const carousel = Array.isArray(images.carousel) ? images.carousel : [];
+  const detail = Array.isArray(images.detail) ? images.detail : [];
+  const sku = Array.isArray(images.sku) ? images.sku : [];
+  const skuAll = typeof images.skuAll === "string" ? [images.skuAll] : [];
+  if (carousel.length > 10) throw new Error("carousel_too_many:" + carousel.length);
+  if (detail.length > 50) throw new Error("detail_too_many:" + detail.length);
+  const all = [...carousel, ...detail, ...sku.map((x) => x && x.path), ...skuAll].filter(Boolean);
+  const infos = [];
+  for (const f of all) infos.push(await imageInfo(f));
+  for (const m of infos) {
+    if (m.format === "png" || m.format === "jpeg") {
+      const ratio = m.width / m.height;
+      const square = Math.abs(ratio - 1) <= 0.03;
+      const portrait34 = Math.abs(ratio - 0.75) <= 0.03;
+      if (carousel.includes(m.file) && !(m.width >= 480 && m.height >= 480 && (square || portrait34))) {
+        throw new Error("carousel_bad_ratio:" + m.file + ":" + m.width + "x" + m.height);
+      }
+    }
+  }
+  log("image_preflight", JSON.stringify({ count: infos.length, carousel: carousel.length, detail: detail.length, sku: sku.length, skuAll: skuAll.length }));
+  return infos;
+}
 async function main() {
+  await preflightImages();
   await openEdit();
   let changed = [];
   const hasPrice = JOB.pricePercent !== undefined && JOB.pricePercent !== null && Number.isFinite(Number(JOB.pricePercent));
