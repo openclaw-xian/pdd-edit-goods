@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3 — 2026-11-23
+
+- 修 run.mjs 启动：worker wrapper URL 改正斜杠，不再用 PowerShell 包一层。
+- 专用空间选择：只用 `pdd-edit-goods-*` 命名空间；不碰用户 `店铺-*` 空间；handOff 后仍可 takeOver 自己的空间。
+- runner smoke 通过：space 9，no-op fill 72 SKU，25.9s，exit 0。
+
 ## 0.2.2 — 2026-11-21
 
 - 最终全量冒烟：轮播 2/10（首图为测试图）、详情 2/50、SKU 72/72；全部未保存。

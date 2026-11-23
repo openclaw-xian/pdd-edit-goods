@@ -169,4 +169,4 @@ md 表：规格编码 / 原库存 / 改后库存 / 原拼单价 / 改后拼单�
   - 详情图：12/50 → 留 1 → 上传 2 → 3 → 删开头旧图 → 2
   - SKU 预览：72/72 行全部删旧 → 行内上传 → background-image 恢复
 - 改价/库存 fill：72/72；submit live；restore 回原值 13.50～47.50 / 719928
-- 已知：`run.mjs` 的 ego 子进程启动在当前环境有卡住记录；直接 worker 已验证可用
+- `run.mjs` 已修：wrapper URL 正斜杠 + 专用空间；2026-11-23 runner smoke 通过（space 9，25.9s）

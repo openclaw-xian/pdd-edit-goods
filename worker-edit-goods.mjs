@@ -19,22 +19,33 @@ function localStamp() { return new Date(Date.now() + 8 * 3600 * 1000).toISOStrin
 async function newPageSafe() { const pages = await task.pages().catch(() => []); if (pages.length >= 8) throw new Error("page_budget_full:" + pages.length); return task.newPage(); }
 
 async function openEdit() {
+  const ps = await profiles();
+  const prof = ps.find((x) => String(x.name || "") === String(JOB.profile || ""));
+  if (!prof) throw new Error("shop_not_logged_in:" + JOB.profile);
   const spaces = await listTaskSpaces();
-  let entry = spaces.find((s) => String(s.profileName || "") === String(JOB.profile || ""));
+  let entry = null;
+  if (JOB.spaceId !== undefined && JOB.spaceId !== null) {
+    entry = spaces.find((s) => Number(s.id) === Number(JOB.spaceId));
+    if (entry && String(entry.ownership) !== "agent") throw new Error("space_not_owned:" + JOB.spaceId);
+  } else {
+    // 只用自己的空间：名字以 pdd-edit-goods- 开头且 ownership=agent；不碰 user / agentDelegatedToUser
+    entry = spaces.find((s) => /^pdd-edit-goods-/.test(String(s.name || "")) && String(s.profileName || "") === String(JOB.profile || ""));
+  }
   if (entry) {
-    task = entry.ownership === "user" ? await claimTaskSpace(entry.id) : entry.ownership === "agentDelegatedToUser" ? await takeOverTaskSpace(entry.id) : await taskSpace(entry.id);
-    page = await newPageSafe().catch(async (e) => {
+    task = String(entry.ownership) === "agent" ? await taskSpace(entry.id) : await takeOverTaskSpace(entry.id);
+    log("space", JSON.stringify({ id: entry.id, name: entry.name, ownership: entry.ownership }));
+    try {
+      page = await newPageSafe();
+    } catch (e) {
       if (!/page_budget_full/.test(String(e.message || e))) throw e;
       log("page_budget_recreate", String(e.message || e));
       try { await task.finish({ keep: [] }); } catch (e2) {}
-      return null;
-    });
+      task = null; page = null;
+    }
   }
   if (!page) {
-    const ps = await profiles();
-    const p = ps.find((x) => String(x.name || "") === String(JOB.profile || ""));
-    if (!p) throw new Error("shop_not_logged_in:" + JOB.profile);
-    task = await taskSpace("pdd-edit-goods-" + JOB.shop + "-" + Date.now(), { profileId: p.id });
+    task = await taskSpace("pdd-edit-goods-" + JOB.shop + "-" + Date.now(), { profileId: prof.id });
+    log("space_new", JSON.stringify({ id: task.id, name: "pdd-edit-goods-" + JOB.shop }));
     page = await newPageSafe();
   }
   await page.goto("https://mms.pinduoduo.com/goods/goods_list", { timeout: 60000 });

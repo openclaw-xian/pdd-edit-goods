@@ -52,8 +52,8 @@ async function runOne(store, i) {
   const wrapper = path.join(RUNTIME, "job-" + i + ".mjs");
   await fs.writeFile(wrapper, "globalThis.__JOB = " + JSON.stringify(job) + ";\nawait import('file:///" + WORKER + "');\n", "utf8");
   const started = Date.now();
-  const psCmd = "& '" + EGO + "' nodejs -e \"await import('file:///" + wrapper + "')\"";
-  const child = spawn("powershell.exe", ["-NoProfile", "-Command", psCmd], { stdio: "inherit", windowsHide: true });
+  const wrapperUrl = "file:///" + wrapper.replace(/\\/g, "/");
+  const child = spawn(EGO, ["nodejs", "-e", "await import('" + wrapperUrl + "')"], { stdio: "inherit", windowsHide: true });
   child.on("error", (e) => { try { console.error("SPAWN_ERROR=" + e.message); } catch (_) {} });
   let result = null;
   const deadline = started + Number(CFG.jobTimeoutSec || 600) * 1000;
