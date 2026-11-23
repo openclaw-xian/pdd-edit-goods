@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4 — 2026-11-23
+
+- 空间定位改为按**名字**持久化到 `~/.pdd-edit-goods-spaces.json`，不依赖 spaceId 或列表顺序。
+- 只使用 `pdd-edit-goods-*` 自己的空间；其他空间被删/顺序变化不影响。
+- 实测：runner 按名字找到 space 9，no-op fill 72 SKU，26.4s，exit 0。
+
 ## 0.2.3 — 2026-11-23
 
 - 修 run.mjs 启动：worker wrapper URL 改正斜杠，不再用 PowerShell 包一层。

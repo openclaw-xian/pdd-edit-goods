@@ -1,11 +1,13 @@
 // worker-edit-goods.mjs — 编辑页改价/库存（fill 默认，不保存）
 const fs = await import("node:fs/promises");
+const os = await import("node:os");
 const JOB = globalThis.__JOB || {};
 const T0 = Date.now();
 const logs = [];
 const log = (...a) => { const s = "[t=" + ((Date.now() - T0) / 1000).toFixed(1) + "s] " + a.map((x) => typeof x === "string" ? x : JSON.stringify(x)).join(" "); logs.push(s); console.log(s); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const RECORD_DIR = (JOB.recordRoot || "D:/pdd-edit-goods").replace(/\\/g, "/").replace(/\/$/, "") + "/" + JOB.shop;
+const SPACE_STATE = String(JOB.spaceStatePath || (os.homedir() + "/.pdd-edit-goods-spaces.json")).replace(/\\/g, "/");
 let task = null, page = null;
 
 async function writeResult(obj) {
@@ -18,20 +20,33 @@ function today() { return new Date(Date.now() + 8 * 3600 * 1000).toISOString().s
 function localStamp() { return new Date(Date.now() + 8 * 3600 * 1000).toISOString().replace("T", " ").slice(0, 19) + " +08:00"; }
 async function newPageSafe() { const pages = await task.pages().catch(() => []); if (pages.length >= 8) throw new Error("page_budget_full:" + pages.length); return task.newPage(); }
 
+async function loadSpaceState() {
+  try { return JSON.parse(await fs.readFile(SPACE_STATE, "utf8")); } catch (e) { return {}; }
+}
+async function saveSpaceState(state) {
+  try { await fs.writeFile(SPACE_STATE, JSON.stringify(state, null, 1), "utf8"); } catch (e) {}
+}
+
 async function openEdit() {
   const ps = await profiles();
   const prof = ps.find((x) => String(x.name || "") === String(JOB.profile || ""));
   if (!prof) throw new Error("shop_not_logged_in:" + JOB.profile);
   const spaces = await listTaskSpaces();
+  const state = await loadSpaceState();
+  const key = String(JOB.profile || "");
+  const preferred = state[key] && state[key].name ? String(state[key].name) : "";
+  const ours = spaces.filter((s) => /^pdd-edit-goods-/.test(String(s.name || "")) && String(s.profileName || "") === String(JOB.profile || ""));
   let entry = null;
   if (JOB.spaceId !== undefined && JOB.spaceId !== null) {
     entry = spaces.find((s) => Number(s.id) === Number(JOB.spaceId));
     if (entry && String(entry.ownership) !== "agent") throw new Error("space_not_owned:" + JOB.spaceId);
-  } else {
-    // 只用自己的空间：名字以 pdd-edit-goods- 开头且 ownership=agent；不碰 user / agentDelegatedToUser
-    entry = spaces.find((s) => /^pdd-edit-goods-/.test(String(s.name || "")) && String(s.profileName || "") === String(JOB.profile || ""));
+  } else if (preferred) {
+    entry = ours.find((s) => String(s.name || "") === preferred) || null;
   }
+  if (!entry && ours.length) entry = ours[0];
   if (entry) {
+    state[key] = { name: String(entry.name || "") };
+    await saveSpaceState(state);
     task = String(entry.ownership) === "agent" ? await taskSpace(entry.id) : await takeOverTaskSpace(entry.id);
     log("space", JSON.stringify({ id: entry.id, name: entry.name, ownership: entry.ownership }));
     try {
@@ -44,8 +59,11 @@ async function openEdit() {
     }
   }
   if (!page) {
-    task = await taskSpace("pdd-edit-goods-" + JOB.shop + "-" + Date.now(), { profileId: prof.id });
-    log("space_new", JSON.stringify({ id: task.id, name: "pdd-edit-goods-" + JOB.shop }));
+    const name = "pdd-edit-goods-" + JOB.shop;
+    task = await taskSpace(name, { profileId: prof.id });
+    state[key] = { name };
+    await saveSpaceState(state);
+    log("space_new", JSON.stringify({ id: task.id, name }));
     page = await newPageSafe();
   }
   await page.goto("https://mms.pinduoduo.com/goods/goods_list", { timeout: 60000 });

@@ -22,6 +22,14 @@ description: 拼多多多店铺「商品编辑」：在商品编辑页批量换�
   - `"submit"`：点「提交」，需 `confirmSubmit:true`
 - 换图与改价/库存可以同页做，但**建议分两轮**：先换图检查，再改价/库存检查，最后统一保存/提交。
 
+## 空间归属
+
+- 只使用名字以 `pdd-edit-goods-` 开头的专用空间；不碰用户 `店铺-*` 空间。
+- 上次使用的空间名持久化到 `~/.pdd-edit-goods-spaces.json`（profile → name）。
+- 下次按**名字**恢复，不依赖 spaceId 或列表顺序；其他空间被删/顺序变化无影响。
+- 如果专用空间被删，新建 `pdd-edit-goods-<店铺>` 并更新状态文件。
+- 空间 handOff 后仍可 takeOver；不要抢用户正在用的空间。
+
 ## 前置
 
 1. ego 浏览器；按店铺名 `profiles()` 取 `profileId`，建/续空间，回读左侧店铺名。
