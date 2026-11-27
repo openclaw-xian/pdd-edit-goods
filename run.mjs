@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
+import { resolveLedgerRoot, appendOperation } from "./record.mjs";
 
 const CFG_PATH = process.argv[2];
 if (!CFG_PATH) { console.error("用法: node run.mjs edit-config.json"); process.exit(2); }
@@ -12,6 +13,7 @@ const CFG = JSON.parse(await fs.readFile(CFG_PATH, "utf8"));
 const SELF_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WORKER = String(CFG.worker || path.join(SELF_DIR, "worker-edit-goods.mjs")).replace(/\\/g, "/");
 const RECORD_ROOT = String(CFG.recordRoot || "D:/pdd-edit-goods").replace(/\\/g, "/").replace(/\/$/, "");
+const LEDGER_ROOT = resolveLedgerRoot(CFG);
 const EGO = String(CFG.ego || path.join(os.homedir(), ".local", "share", "ego", "active_version_dir", "ego-browser.exe")).replace(/\\/g, "/");
 const RUN_ID = "edit-goods-" + new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
 const RUN_DIR = path.join(RECORD_ROOT, "_runs", RUN_ID);
@@ -65,10 +67,16 @@ async function runOne(store, i) {
   return { shop: store.shop, goodsId, result, wallSec: Number(((Date.now() - started) / 1000).toFixed(1)) };
 }
 
+async function recordEdit(r) {
+  if (saveMode === "fill" || !r.result || !r.result.saved || !r.result.saved.ok) return;
+  const status = r.result.status || "done";
+  await appendOperation({ root: LEDGER_ROOT, skill: "pdd-edit-goods", shop: r.shop, action: "edit-goods-" + saveMode, goodsId: r.goodsId, targetId: r.goodsId, target: "商品编辑", before: "编辑前", after: status === "rejected" ? "平台驳回" : (r.result.summary ? JSON.stringify(r.result.summary).slice(0, 500) : "已保存"), result: status === "rejected" ? "rejected" : "success", runId: RUN_ID, evidence: path.join(RESULT_DIR, r.shop + ".json") });
+}
 const done = [];
 for (let i = 0; i < shops.length; i++) {
   const r = await runOne(shops[i], i);
   done.push(r);
+  try { await recordEdit(r); } catch (e) { console.error("RECORD_FAILED " + (e && e.message || e)); }
   console.log("DONE " + r.shop + " goodsId=" + r.goodsId + " status=" + (r.result.status || "?") + " changed=" + ((r.result.changed && r.result.changed.length) || 0) + " wall=" + r.wallSec + "s" + (r.result.error ? " err=" + r.result.error : ""));
 }
 const report = { runId: RUN_ID, saveMode, pricePercent, stockSet, recordRoot: RECORD_ROOT, stores: done.map((d) => ({ shop: d.shop, goodsId: d.goodsId, wallSec: d.wallSec, ...d.result })) };
