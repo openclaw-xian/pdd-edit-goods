@@ -86,11 +86,21 @@ async function openEdit() {
   if (/新版本已驳回|审核不通过|审核驳回/.test(rowText)) throw new Error("product_rejected_version:" + rowText.slice(-260));
   const editBtn = await page.evaluate((gid) => { const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;}; const txt=(e)=>(e?(e.innerText||e.textContent||"").trim():""); const anchor=[...document.querySelectorAll("*")].find(e=>vis(e)&&!e.children.length&&txt(e).includes(gid)); if(!anchor)return null; let n=anchor,row=null; for(let i=0;i<8&&n;i++){n=n.parentElement;if(!n)break;if(/销售中|已下架/.test(txt(n))){row=n;break;}} if(!row)return null; const btn=[...row.querySelectorAll("*")].filter(e=>vis(e)&&!e.children.length&&txt(e)==="编辑")[0]; if(!btn)return null; const r=btn.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}; }, JOB.goodsId);
   if (!editBtn) throw new Error("edit_button_not_found");
-  const before = (await task.pages()).length;
   await page.mouse.click(editBtn.x, editBtn.y);
-  await page.waitForTimeout(4500);
-  const pages = await task.pages();
-  const edit = pages.length > before ? pages[pages.length - 1] : pages[pages.length - 1];
+  let edit = null;
+  for (let i = 0; i < 20 && !edit; i++) {
+    const pages = await task.pages();
+    for (const p of pages) {
+      let u = ""; try { u = String(await p.url()); } catch {}
+      if (u.includes("goods_add") && u.includes(JOB.goodsId)) { edit = p; break; }
+    }
+    if (!edit) await sleep(500);
+  }
+  if (!edit) {
+    const pages = await task.pages();
+    for (const p of pages) { let u = ""; try { u = String(await p.url()); } catch {} if (u.includes("goods_add")) { edit = p; break; } }
+  }
+  if (!edit) throw new Error("edit_page_not_open:no_goods_add_tab");
   page = edit;
   await page.waitForTimeout(3500);
   const url = await page.url();
@@ -281,7 +291,10 @@ async function replaceDetail(files) {
   let st = await detailState();
   if (!st.found) throw new Error("detail_not_found");
   log("detail_before", JSON.stringify(st));
-  for (let i=0;i<80 && st.uploaded>1;i++) {
+  if (st.imgs === 0) throw new Error("detail_area_empty");
+  const MIN_DETAIL = 2;
+  const hadOld = st.imgs > 0;
+  for (let i=0;i<80 && st.imgs>MIN_DETAIL;i++) {
     const hit = await page.evaluate(() => {
       const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
       const groups=[...document.querySelectorAll(".mui-form-group")];
@@ -304,7 +317,7 @@ async function replaceDetail(files) {
     if(!del) break; await page.mouse.click(del.x,del.y); await page.waitForTimeout(800);
     st=await detailState(); log("detail_delete",JSON.stringify(st));
   }
-  if (st.uploaded > 1) throw new Error("detail_delete_incomplete:" + st.uploaded);
+  if (st.imgs > MIN_DETAIL) throw new Error("detail_delete_incomplete:" + st.imgs);
   const input=await page.evaluate(()=>{
     const groups=[...document.querySelectorAll(".mui-form-group")];
     const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
@@ -328,6 +341,7 @@ async function replaceDetail(files) {
     if(d){await page.mouse.click(d.x,d.y); await page.waitForTimeout(800);}
   }
   st=await detailState(); log("detail_final",JSON.stringify(st));
+  if (st.imgs < Math.max(MIN_DETAIL, files.length)) throw new Error("detail_upload_incomplete:" + st.imgs);
   return {after:st, uploaded:files.length};
 }
 async function collectSkuCodes() {
