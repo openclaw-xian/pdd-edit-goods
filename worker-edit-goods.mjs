@@ -288,7 +288,8 @@ async function detailState() {
     const src=firstImg?String(firstImg.src||""):"";
     const bg=first?getComputedStyle(first).backgroundImage:"";
     const firstText=first?String(first.innerText||""):"";
-    const firstEmpty=!first || /文本暂无预览|暂无预览/.test(firstText) || (!/^https?:/i.test(src) && !/url\(["']?https?:/i.test(bg));
+    const groupText=String(g.innerText||"");
+    const firstEmpty=!first || /文本暂无预览|暂无预览/.test(firstText) || /文本暂无预览|暂无预览/.test(groupText) || (!/^https?:/i.test(src) && !/url\(["']?https?:/i.test(bg));
     return {found:true,uploaded:m?Number(m[1]):null,imgs:imgs.length,firstEmpty,files:g.querySelectorAll('input[type=file]').length};
   });
 }
@@ -324,7 +325,9 @@ async function replaceDetail(files) {
       const r=d.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
     });
     if(!del) break; await page.mouse.click(del.x,del.y); await page.waitForTimeout(800);
+    const prevImgs = st.imgs;
     st=await detailState(); log("detail_delete",JSON.stringify(st));
+    if (st.imgs >= prevImgs) { log("detail_delete_stuck", st.imgs); break; }
   }
   if (st.imgs > MIN_DETAIL + 1) throw new Error("detail_delete_incomplete:" + st.imgs);
   const input=await page.evaluate(()=>{
