@@ -282,7 +282,14 @@ async function detailState() {
     if(!g)return {found:false};
     const t=(g.innerText||"");
     const m=t.match(/已上传\s*(\d+)\/50/);
-    return {found:true,uploaded:m?Number(m[1]):null,imgs:g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]').length, files:g.querySelectorAll('input[type=file]').length};
+    const imgs=[...g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]')];
+    const first=imgs[0];
+    const firstImg=first?first.querySelector("img"):null;
+    const src=firstImg?String(firstImg.src||""):"";
+    const bg=first?getComputedStyle(first).backgroundImage:"";
+    const firstText=first?String(first.innerText||""):"";
+    const firstEmpty=!first || /文本暂无预览|暂无预览/.test(firstText) || (!/^https?:/i.test(src) && !/url\(["']?https?:/i.test(bg));
+    return {found:true,uploaded:m?Number(m[1]):null,imgs:imgs.length,firstEmpty,files:g.querySelectorAll('input[type=file]').length};
   });
 }
 
@@ -292,7 +299,9 @@ async function replaceDetail(files) {
   if (!st.found) throw new Error("detail_not_found");
   log("detail_before", JSON.stringify(st));
   if (st.imgs === 0) throw new Error("detail_area_empty");
-  const MIN_DETAIL = 1;
+  const placeholder = !!st.firstEmpty;
+  const MIN_DETAIL = (st.imgs === 2 || placeholder) ? 2 : 1;
+  const oldIndex = placeholder ? 1 : 0;
   const hadOld = st.imgs > 0;
   for (let i=0;i<80 && st.imgs>MIN_DETAIL;i++) {
     const hit = await page.evaluate(() => {
@@ -317,7 +326,7 @@ async function replaceDetail(files) {
     if(!del) break; await page.mouse.click(del.x,del.y); await page.waitForTimeout(800);
     st=await detailState(); log("detail_delete",JSON.stringify(st));
   }
-  if (st.imgs > 2) throw new Error("detail_delete_incomplete:" + st.imgs);
+  if (st.imgs > MIN_DETAIL + 1) throw new Error("detail_delete_incomplete:" + st.imgs);
   const input=await page.evaluate(()=>{
     const groups=[...document.querySelectorAll(".mui-form-group")];
     const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
@@ -328,16 +337,16 @@ async function replaceDetail(files) {
   await page.waitForTimeout(2500);
   st=await detailState(); log("detail_after_upload",JSON.stringify(st));
   // delete first old image (keep first was old)
-  const delFirst=await page.evaluate(()=>{
+  const delFirst=await page.evaluate((idx)=>{
     const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
     const groups=[...document.querySelectorAll(".mui-form-group")];
     const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
-    if(!g)return null; const imgs=[...g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]')].filter(vis); const slot=imgs[0]; if(!slot)return null; slot.scrollIntoView({block:"center"});
+    if(!g)return null; const imgs=[...g.querySelectorAll('[class*="ImageWithRemark_v2_imageContainer"]')].filter(vis); const slot=imgs[idx]; if(!slot)return null; slot.scrollIntoView({block:"center"});
     const r=slot.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
-  });
+  }, oldIndex);
   if(delFirst){
     await page.mouse.move(delFirst.x,delFirst.y); await page.waitForTimeout(350);
-    const d=await page.evaluate(()=>{const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};const groups=[...document.querySelectorAll(".mui-form-group")];const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));const ds=[...g.querySelectorAll('[class*="DeleteIcon"]')].filter(vis);const d=ds[0];if(!d)return null;const r=d.getBoundingClientRect();return{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};});
+    const d=await page.evaluate((idx)=>{const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};const groups=[...document.querySelectorAll(".mui-form-group")];const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));const ds=[...g.querySelectorAll('[class*="DeleteIcon"]')].filter(vis);const d=ds[idx];if(!d)return null;const r=d.getBoundingClientRect();return{x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};}, oldIndex);
     if(d){await page.mouse.click(d.x,d.y); await page.waitForTimeout(800);}
   }
   st=await detailState(); log("detail_final",JSON.stringify(st));
