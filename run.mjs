@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { resolveLedgerRoot, appendOperation } from "./record.mjs";
+import { resolveLedgerRoot, assertCan, recordResult } from "./product-ledger.mjs";
 
 const CFG_PATH = process.argv[2];
 if (!CFG_PATH) { console.error("用法: node run.mjs edit-config.json"); process.exit(2); }
@@ -34,6 +34,14 @@ if (pricePercent === null && stockSet === null && !Array.isArray(images.carousel
 if ((pricePercent !== null && !Number.isFinite(pricePercent)) || (stockSet !== null && !Number.isFinite(stockSet))) addIssue("value_invalid", "pricePercent/stockSet 必须是数字");
 if (saveMode === "submit" && CFG.confirmSubmit !== true) addIssue("submit_not_confirmed", "submit 生效需显式 confirmSubmit:true；先用 fill 检查");
 if (!shops.some((s) => s.goodsId || CFG.goodsId)) addIssue("goods_missing", "需要 goodsId（全局或每个 shop）");
+if (saveMode !== "fill") {
+  for (const s of shops) {
+    const id = String(s.goodsId || CFG.goodsId || "");
+    if (!id) continue;
+    const chk = await assertCan({ root: LEDGER_ROOT, shop: s.shop, goodsId: id, action: "edit-goods-" + saveMode, targetId: id, allowUnknown: true });
+    if (!chk.allowed) addIssue(chk.blocked, `商品 ${id} 当前状态 ${chk.state.lifecycleStatus}，不能编辑`);
+  }
+}
 if (!existsSync(EGO)) addIssue("ego_not_found", "ego-browser 不可用");
 if (issues.length) { console.log("PREFLIGHT=needs_user_input"); console.log(JSON.stringify({ status: "needs_user_input", issues }, null, 1)); process.exit(3); }
 
@@ -70,7 +78,7 @@ async function runOne(store, i) {
 async function recordEdit(r) {
   if (saveMode === "fill" || !r.result || !r.result.saved || !r.result.saved.ok) return;
   const status = r.result.status || "done";
-  await appendOperation({ root: LEDGER_ROOT, skill: "pdd-edit-goods", shop: r.shop, action: "edit-goods-" + saveMode, goodsId: r.goodsId, targetId: r.goodsId, target: "商品编辑", before: "编辑前", after: status === "rejected" ? "平台驳回" : (r.result.summary ? JSON.stringify(r.result.summary).slice(0, 500) : "已保存"), result: status === "rejected" ? "rejected" : "success", runId: RUN_ID, evidence: path.join(RESULT_DIR, r.shop + ".json") });
+  await recordResult({ root: LEDGER_ROOT, skill: "pdd-edit-goods", shop: r.shop, action: "edit-goods-" + saveMode, goodsId: r.goodsId, targetId: r.goodsId, target: "商品编辑", before: "编辑前", after: { price: r.result.summary && r.result.summary.priceRange || null, stock: r.result.summary && r.result.summary.totalStock || null, lifecycleStatus: status === "rejected" ? "未知" : "在售" }, result: status === "rejected" ? "rejected" : "success", runId: RUN_ID, evidence: path.join(RESULT_DIR, r.shop + ".json") });
 }
 const done = [];
 for (let i = 0; i < shops.length; i++) {
