@@ -1,12 +1,13 @@
 // worker-edit-goods.mjs — 编辑页改价/库存（fill 默认，不保存）
 const fs = await import("node:fs/promises");
+const path = await import("node:path");
 const os = await import("node:os");
 const JOB = globalThis.__JOB || {};
 const T0 = Date.now();
 const logs = [];
 const log = (...a) => { const s = "[t=" + ((Date.now() - T0) / 1000).toFixed(1) + "s] " + a.map((x) => typeof x === "string" ? x : JSON.stringify(x)).join(" "); logs.push(s); console.log(s); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const RECORD_DIR = (JOB.recordRoot || "D:/pdd-edit-goods").replace(/\\/g, "/").replace(/\/$/, "") + "/" + JOB.shop;
+const RECORD_DIR = (JOB.recordRoot || path.join(process.cwd(), "pdd-edit-goods")).replace(/\\/g, "/").replace(/\/$/, "") + "/" + JOB.shop;
 const SPACE_STATE = String(JOB.spaceStatePath || (os.homedir() + "/.pdd-edit-goods-spaces.json")).replace(/\\/g, "/");
 let task = null, page = null;
 

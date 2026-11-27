@@ -16,7 +16,7 @@ node run.mjs edit-config.json
 
 ```json
 {
-  "recordRoot": "D:/pdd-edit-goods",
+  "recordRoot": "<编辑记录目录>",
   "saveMode": "fill",
   "confirmSubmit": false,
   "shops": [
@@ -25,9 +25,9 @@ node run.mjs edit-config.json
   "pricePercent": 10,
   "stockSet": 10000,
   "images": {
-    "carousel": ["D:/img/main-01.png", "D:/img/main-02.png"],
-    "detail": ["D:/img/detail-01.png", "D:/img/detail-02.png"],
-    "sku": [{ "match": "<规格编码>", "path": "D:/img/sku-01.png" }]
+    "carousel": ["<图片目录>/main-01.png", "<图片目录>/main-02.png"],
+    "detail": ["<图片目录>/detail-01.png", "<图片目录>/detail-02.png"],
+    "sku": [{ "match": "<规格编码>", "path": "<图片目录>/sku-01.png" }]
   }
 }
 ```

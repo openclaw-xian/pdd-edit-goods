@@ -12,7 +12,7 @@ if (!CFG_PATH) { console.error("用法: node run.mjs edit-config.json"); process
 const CFG = JSON.parse(await fs.readFile(CFG_PATH, "utf8"));
 const SELF_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WORKER = String(CFG.worker || path.join(SELF_DIR, "worker-edit-goods.mjs")).replace(/\\/g, "/");
-const RECORD_ROOT = String(CFG.recordRoot || "D:/pdd-edit-goods").replace(/\\/g, "/").replace(/\/$/, "");
+const RECORD_ROOT = String(CFG.recordRoot || path.join(process.cwd(), "pdd-edit-goods")).replace(/\\/g, "/").replace(/\/$/, "");
 const LEDGER_ROOT = resolveLedgerRoot(CFG);
 try { if (CFG.ledgerRoot && CFG.persistLedgerRoot !== false) saveLedgerRoot(LEDGER_ROOT); } catch {}
 const EGO = String(CFG.ego || path.join(os.homedir(), ".local", "share", "ego", "active_version_dir", "ego-browser.exe")).replace(/\\/g, "/");

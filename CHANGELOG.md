@@ -1,3 +1,7 @@
+## 0.3.20 — 2026-11-27
+
+- 脱敏：真实店铺名/商品 ID 改为 `<店铺>`/`<商品ID>`。
+- 默认路径从 `D:/pdd-edit-goods` 改为 `process.cwd()/pdd-edit-goods`。
 ## 0.3.19 — 2026-11-27
 
 - 读取共享账本配置；一个 skill 指定 `ledgerRoot` 后其他 skill 自动复用。
