@@ -1,3 +1,7 @@
+## 0.3.18 — 2026-11-27
+
+- 首次使用必须指定 `ledgerRoot`，未配置返回 `ledger_root_required`，不再默认 C 盘。
+
 ## 0.3.17 — 2026-11-27
 
 - 未知提交错误统一 `platform_submit_blocked`，读取并输出平台弹窗原文。

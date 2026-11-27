@@ -49,3 +49,7 @@ node run.mjs edit-config.json
 ## 操作账本
 
 保存/提交成功后写入 `店铺运营日志/商品编辑/`，按商品生成历史；`fill` 模式不记录。
+
+## 首次使用
+
+必须询问用户运营日志目录并配置 `ledgerRoot`；未配置返回 `ledger_root_required`，不默认 C 盘，不创建目录。

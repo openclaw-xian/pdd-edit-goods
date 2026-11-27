@@ -27,6 +27,7 @@ const images = CFG.images || {};
 const shops = (CFG.shops || []).map((s) => typeof s === "string" ? { shop: s } : s).filter((s) => s && s.shop);
 const issues = [];
 const addIssue = (code, q) => issues.push({ code, question: q });
+if (!LEDGER_ROOT) addIssue("ledger_root_required", "首次使用请指定运营日志目录 ledgerRoot，不要默认 C 盘");
 
 if (!shops.length) addIssue("shops_missing", "config 需要 shops");
 if (!["fill", "draft", "submit"].includes(saveMode)) addIssue("saveMode_invalid", "saveMode 只能是 fill/draft/submit");
