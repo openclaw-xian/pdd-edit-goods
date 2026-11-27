@@ -194,11 +194,21 @@ async function clickSave(label) {
   });
   if (confirm) { await page.mouse.click(confirm.x, confirm.y); await page.waitForTimeout(3500); }
   await page.waitForTimeout(3000);
-  const state = await page.evaluate(() => ({ url: location.href, text: (document.body.innerText || "").slice(-1500) }));
+  const state = await page.evaluate(() => {
+    const vis = (x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const t = (x) => x ? String(x.innerText || x.textContent || "").trim() : "";
+    const dialogs = [...document.querySelectorAll("[class*=MDL], [role=dialog], [class*=modal], [class*=Modal], [class*=Dialog], [class*=Toast], [class*=toast]")].filter(vis).map(t).filter(Boolean);
+    return { url: location.href, text: (document.body.innerText || "").slice(-2000), dialogs: dialogs.join(" | ").slice(0, 2000) };
+  });
   const url = String(state.url);
   const successUrl = /goods_add\/success/.test(url);
-  const successToast = /保存成功|草稿保存成功|保存草稿成功/.test(state.text);
-  return { ok: successUrl || successToast, url, confirm: confirm ? confirm.text : null, successUrl, successToast };
+  const successToast = /保存成功|草稿保存成功|保存草稿成功|提交成功|已提交|审核中/.test(state.text);
+  const dialogText = (state.dialogs || "") + " | " + (state.text || "");
+  if (/大促.*资源位|大促搜索池|规格拼单价不能增加|无法修改\s*SKU\s*图|SKU\s*图.*(锁定|无法)/i.test(dialogText)) {
+    const blocked = /SKU\s*图|规格图/i.test(dialogText) ? "sku_image_locked_by_activity" : "price_locked_by_activity";
+    return { ok: false, blocked, dialogText: dialogText.slice(-800), url, confirm: confirm ? confirm.text : null, successUrl: false, successToast: false };
+  }
+  return { ok: successUrl || successToast, url, confirm: confirm ? confirm.text : null, successUrl, successToast, dialogText: dialogText.slice(-500) };
 }
 
 async function carouselState() {
@@ -474,6 +484,26 @@ async function verifyImageSubmitOutcome() {
   return { checked: true, rejected: /新版本已驳回|审核不通过|审核驳回/.test(text), auditing: /审核中|发布中/.test(text), sale: /销售中/.test(text), rowText: text.slice(0, 500) };
 }
 
+async function waitImagesReady(timeoutMs = 120000) {
+  const start = Date.now();
+  let last = "", stable = 0;
+  while (Date.now() - start < timeoutMs) {
+    const s = await page.evaluate(() => {
+      const t = document.body.innerText || "";
+      const car = document.querySelector(".goods-basic-line.carouse");
+      return { uploading: /上传中|图片上传中|正在上传/.test(t), failed: /上传失败|图片上传失败/.test(t), carImgs: car ? car.querySelectorAll("img").length : 0 };
+    });
+    if (s.failed) throw new Error("image_upload_failed");
+    const sig = JSON.stringify(s);
+    if (!s.uploading && sig === last) stable++; else stable = 0;
+    last = sig;
+    if (stable >= 3) { log("images_ready", sig); return s; }
+    await page.waitForTimeout(1000);
+  }
+  log("images_wait_timeout");
+  return null;
+}
+
 async function main() {
   await preflightImages();
   await openEdit();
@@ -495,6 +525,7 @@ async function main() {
   if (typeof images.skuAll === "string" && images.skuAll) {
     imagesResult = { ...(imagesResult || {}), skuAll: await replaceAllSkuPreviews(images.skuAll) };
   }
+  if (imagesResult) await waitImagesReady();
   const summary = await page.evaluate(() => {
     const t=document.body.innerText||"";
     const m=t.match(/总库存\s*([0-9]+)/);
@@ -509,7 +540,7 @@ async function main() {
     saved = await clickSave(mode === "submit" ? "提交" : "保存草稿");
     log("save_result", JSON.stringify(saved));
     if (mode === "submit") {
-      if (!saved.ok) finalStatus = "submit_failed";
+      if (!saved.ok) finalStatus = saved.blocked ? "needs" : "submit_failed";
       else {
         submitOutcome = await verifyImageSubmitOutcome();
         if (submitOutcome && submitOutcome.rejected) finalStatus = "rejected";

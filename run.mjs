@@ -76,9 +76,11 @@ async function runOne(store, i) {
 }
 
 async function recordEdit(r) {
-  if (saveMode === "fill" || !r.result || !r.result.saved || !r.result.saved.ok) return;
+  if (saveMode === "fill" || !r.result || !r.result.saved) return;
+  const blocked = r.result.saved.blocked || null;
+  if (!r.result.saved.ok && !blocked) return;
   const status = r.result.status || "done";
-  await recordResult({ root: LEDGER_ROOT, skill: "pdd-edit-goods", shop: r.shop, action: "edit-goods-" + saveMode, goodsId: r.goodsId, targetId: r.goodsId, target: "商品编辑", before: "编辑前", after: { price: r.result.summary && r.result.summary.priceRange || null, stock: r.result.summary && r.result.summary.totalStock || null, lifecycleStatus: status === "rejected" ? "未知" : "在售" }, result: status === "rejected" ? "rejected" : "success", runId: RUN_ID, evidence: path.join(RESULT_DIR, r.shop + ".json") });
+  await recordResult({ root: LEDGER_ROOT, skill: "pdd-edit-goods", shop: r.shop, action: "edit-goods-" + saveMode, goodsId: r.goodsId, targetId: r.goodsId, target: "商品编辑", before: "编辑前", after: blocked ? { status: "blocked", reason: blocked } : { price: r.result.summary && r.result.summary.priceRange || null, stock: r.result.summary && r.result.summary.totalStock || null, lifecycleStatus: status === "rejected" ? "未知" : "在售" }, result: blocked ? "blocked" : (status === "rejected" ? "rejected" : "success"), runId: RUN_ID, evidence: path.join(RESULT_DIR, r.shop + ".json") });
 }
 const done = [];
 for (let i = 0; i < shops.length; i++) {
