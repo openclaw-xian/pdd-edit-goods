@@ -256,10 +256,12 @@ async function replaceCarousel(files) {
       const r=d.getBoundingClientRect(); return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
     });
     if (!del) break;
+    const prevUploaded = st.uploaded;
     await page.mouse.click(del.x, del.y);
     await page.waitForTimeout(900);
     st = await carouselState();
     log("carousel_delete", JSON.stringify(st));
+    if (st.uploaded >= prevUploaded) { log("carousel_delete_stuck", st.uploaded); break; }
   }
   const input = await page.evaluate(() => {
     const car=document.querySelector(".goods-basic-line.carouse");
