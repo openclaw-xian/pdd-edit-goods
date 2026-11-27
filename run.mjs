@@ -112,6 +112,7 @@ if (needs.length) {
     price_locked_by_activity: "商品在大促资源位上，规格拼单价不能增加；请取消活动后再编辑",
     sku_image_locked_by_activity: "商品在大促资源位上，SKU 图被锁定；请等资源位结束或换商品",
     product_delisted: "商品已下架，不能编辑；请先重新上架",
+    platform_submit_blocked: "平台提交被拦截，原因见平台原文",
   };
   for (const s of needs) {
     const blocked = s.saved && s.saved.blocked;

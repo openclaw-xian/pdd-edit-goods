@@ -219,11 +219,16 @@ async function clickSave(label) {
   const successUrl = /goods_add\/success/.test(url);
   const successToast = /保存成功|草稿保存成功|保存草稿成功|提交成功|已提交|审核中/.test(state.text);
   const dialogText = (state.dialogs || "") + " | " + (state.text || "");
+  const lines = String(dialogText || "").split(/\n| \| /).map((x) => x.trim()).filter(Boolean);
+  const platformMessage = lines.filter((x) => /不能|无法|失败|不支持|请|限制|锁定|活动|资源位|审核|错误/.test(x)).slice(-1)[0] || "";
   if (/大促.*资源位|大促搜索池|规格拼单价不能增加|无法修改\s*SKU\s*图|SKU\s*图.*(锁定|无法)/i.test(dialogText)) {
     const blocked = /SKU\s*图|规格图/i.test(dialogText) ? "sku_image_locked_by_activity" : "price_locked_by_activity";
-    return { ok: false, blocked, dialogText: dialogText.slice(-800), url, confirm: confirm ? confirm.text : null, successUrl: false, successToast: false };
+    return { ok: false, blocked, platformMessage, dialogText: dialogText.slice(-800), url, confirm: confirm ? confirm.text : null, successUrl: false, successToast: false };
   }
-  return { ok: successUrl || successToast, url, confirm: confirm ? confirm.text : null, successUrl, successToast, dialogText: dialogText.slice(-500) };
+  if (!successUrl && !successToast && platformMessage) {
+    return { ok: false, blocked: "platform_submit_blocked", platformMessage, dialogText: dialogText.slice(-800), url, confirm: confirm ? confirm.text : null, successUrl: false, successToast: false };
+  }
+  return { ok: successUrl || successToast, url, confirm: confirm ? confirm.text : null, successUrl, successToast, platformMessage, dialogText: dialogText.slice(-500) };
 }
 
 async function carouselState() {
