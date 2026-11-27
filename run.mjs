@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { resolveLedgerRoot, assertCan, recordResult, acquireLock, releaseLock } from "./product-ledger.mjs";
+import { resolveLedgerRoot, saveLedgerRoot, assertCan, recordResult, acquireLock, releaseLock } from "./product-ledger.mjs";
 
 const CFG_PATH = process.argv[2];
 if (!CFG_PATH) { console.error("用法: node run.mjs edit-config.json"); process.exit(2); }
@@ -14,6 +14,7 @@ const SELF_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WORKER = String(CFG.worker || path.join(SELF_DIR, "worker-edit-goods.mjs")).replace(/\\/g, "/");
 const RECORD_ROOT = String(CFG.recordRoot || "D:/pdd-edit-goods").replace(/\\/g, "/").replace(/\/$/, "");
 const LEDGER_ROOT = resolveLedgerRoot(CFG);
+try { if (CFG.ledgerRoot && CFG.persistLedgerRoot !== false) saveLedgerRoot(LEDGER_ROOT); } catch {}
 const EGO = String(CFG.ego || path.join(os.homedir(), ".local", "share", "ego", "active_version_dir", "ego-browser.exe")).replace(/\\/g, "/");
 const RUN_ID = "edit-goods-" + new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
 const RUN_DIR = path.join(RECORD_ROOT, "_runs", RUN_ID);

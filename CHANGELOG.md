@@ -1,3 +1,8 @@
+## 0.3.19 — 2026-11-27
+
+- 读取共享账本配置；一个 skill 指定 `ledgerRoot` 后其他 skill 自动复用。
+- 未配置时仍返回 `ledger_root_required`。
+
 ## 0.3.18 — 2026-11-27
 
 - 首次使用必须指定 `ledgerRoot`，未配置返回 `ledger_root_required`，不再默认 C 盘。
