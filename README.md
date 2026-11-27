@@ -45,3 +45,7 @@ node run.mjs edit-config.json
 `<recordRoot>/<店铺>/pdd-edit-goods-<日期>.md` + `_runs/edit-goods-<时间>/report.json`
 
 详细规则/算法/坑见 [SKILL.md](SKILL.md)。
+
+## 操作账本
+
+保存/提交成功后写入 `店铺运营日志/商品编辑/`，按商品生成历史；`fill` 模式不记录。

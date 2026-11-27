@@ -178,3 +178,12 @@ md 表：规格编码 / 原库存 / 改后库存 / 原拼单价 / 改后拼单�
   - SKU 预览：72/72 行全部删旧 → 行内上传 → background-image 恢复
 - 改价/库存 fill：72/72；submit live；restore 回原值 13.50～47.50 / 719928
 - `run.mjs` 已修：wrapper URL 正斜杠 + 专用空间；2026-11-23 runner smoke 通过（space 9，25.9s）
+
+## 操作账本
+
+`saveMode` 为 `draft`/`submit` 且保存成功时，按商品写：
+
+- `店铺运营日志/商品编辑/<店铺>/<YYYY-MM>/操作记录.jsonl`
+- `商品编辑/<店铺>/商品历史/<年>/<商品ID>.md`
+
+`fill` 只填不保存，不落账。驳回记录 `result=rejected`，不记成功。
