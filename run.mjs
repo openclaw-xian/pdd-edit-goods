@@ -93,4 +93,19 @@ const report = { runId: RUN_ID, saveMode, pricePercent, stockSet, recordRoot: RE
 await fs.writeFile(path.join(RUN_DIR, "report.json"), JSON.stringify(report, null, 1), "utf8");
 console.log("REPORT=" + path.join(RUN_DIR, "report.json"));
 if (report.stores.some((s) => s.status === "failed" || s.status === "submit_failed")) process.exit(5);
-if (report.stores.some((s) => s.status === "needs" || s.needs)) process.exit(4);
+const needs = report.stores.filter((s) => s.status === "needs" || s.needs);
+if (needs.length) {
+  console.log("NEEDS_USER_INPUT");
+  const msgMap = {
+    price_locked_by_activity: "商品在大促资源位上，规格拼单价不能增加；请取消活动后再编辑",
+    sku_image_locked_by_activity: "商品在大促资源位上，SKU 图被锁定；请等资源位结束或换商品",
+    product_delisted: "商品已下架，不能编辑；请先重新上架",
+  };
+  for (const s of needs) {
+    const blocked = s.saved && s.saved.blocked;
+    const detail = s.needs && s.needs.question ? s.needs.question : "";
+    const platform = s.saved && s.saved.dialogText ? String(s.saved.dialogText).split(/\n| \| /).filter(Boolean).slice(-1)[0] : "";
+    console.log("NEEDS " + s.shop + ": " + (msgMap[blocked] || detail || blocked || "需要用户确认") + (platform ? " | 平台原文：" + platform : ""));
+  }
+  process.exit(4);
+}

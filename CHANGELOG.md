@@ -1,3 +1,9 @@
+## 0.3.7 — 2026-11-27
+
+- 提交被平台拦截时输出中文原因，不再只给 submit_failed。
+- 映射 price_locked_by_activity / sku_image_locked_by_activity / product_delisted，并附平台原文。
+- 账本记录 blocked，退出码 4。
+
 ## 0.3.6 — 2026-11-27
 
 - 提交/保存后读取平台弹窗文本，不再只报通用 submit_failed。
