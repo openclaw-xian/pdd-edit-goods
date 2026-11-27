@@ -236,6 +236,8 @@ async function replaceCarousel(files) {
   let st = await carouselState();
   if (!st.found) throw new Error("carousel_not_found");
   log("carousel_before", JSON.stringify(st));
+  await page.evaluate(() => { const car=document.querySelector(".goods-basic-line.carouse"); if (car) car.scrollIntoView({ block: "center" }); });
+  await page.waitForTimeout(600);
   for (let i = 0; i < 15 && st.uploaded > 0; i++) {
     const hit = await page.evaluate(() => {
       const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
@@ -243,6 +245,7 @@ async function replaceCarousel(files) {
       const imgs=[...car.querySelectorAll("img")].filter(vis);
       const slot=imgs[imgs.length-1] ? imgs[imgs.length-1].closest('[class*="MaterialModalButton"]') : null;
       if(!slot)return null;
+      slot.scrollIntoView({ block: "center" });
       const r=slot.getBoundingClientRect();
       return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};
     });
