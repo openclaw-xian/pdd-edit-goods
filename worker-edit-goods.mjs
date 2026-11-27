@@ -281,7 +281,7 @@ async function replaceDetail(files) {
   let st = await detailState();
   if (!st.found) throw new Error("detail_not_found");
   log("detail_before", JSON.stringify(st));
-  for (let i=0;i<12 && st.uploaded>1;i++) {
+  for (let i=0;i<80 && st.uploaded>1;i++) {
     const hit = await page.evaluate(() => {
       const vis=(e)=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0;};
       const groups=[...document.querySelectorAll(".mui-form-group")];
@@ -304,6 +304,7 @@ async function replaceDetail(files) {
     if(!del) break; await page.mouse.click(del.x,del.y); await page.waitForTimeout(800);
     st=await detailState(); log("detail_delete",JSON.stringify(st));
   }
+  if (st.uploaded > 1) throw new Error("detail_delete_incomplete:" + st.uploaded);
   const input=await page.evaluate(()=>{
     const groups=[...document.querySelectorAll(".mui-form-group")];
     const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
