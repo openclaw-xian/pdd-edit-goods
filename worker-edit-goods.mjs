@@ -204,6 +204,11 @@ async function clickSave(label) {
   });
   if (confirm) { await page.mouse.click(confirm.x, confirm.y); await page.waitForTimeout(3500); }
   await page.waitForTimeout(3000);
+  for (let i = 0; i < 60; i++) {
+    const busy = await page.evaluate(() => /提交中|保存中|处理中/.test(document.body.innerText || ""));
+    if (!busy) break;
+    await page.waitForTimeout(1000);
+  }
   const state = await page.evaluate(() => {
     const vis = (x) => { const r = x.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
     const t = (x) => x ? String(x.innerText || x.textContent || "").trim() : "";
