@@ -292,7 +292,7 @@ async function replaceDetail(files) {
   if (!st.found) throw new Error("detail_not_found");
   log("detail_before", JSON.stringify(st));
   if (st.imgs === 0) throw new Error("detail_area_empty");
-  const MIN_DETAIL = 2;
+  const MIN_DETAIL = 1;
   const hadOld = st.imgs > 0;
   for (let i=0;i<80 && st.imgs>MIN_DETAIL;i++) {
     const hit = await page.evaluate(() => {
@@ -317,7 +317,7 @@ async function replaceDetail(files) {
     if(!del) break; await page.mouse.click(del.x,del.y); await page.waitForTimeout(800);
     st=await detailState(); log("detail_delete",JSON.stringify(st));
   }
-  if (st.imgs > MIN_DETAIL) throw new Error("detail_delete_incomplete:" + st.imgs);
+  if (st.imgs > 2) throw new Error("detail_delete_incomplete:" + st.imgs);
   const input=await page.evaluate(()=>{
     const groups=[...document.querySelectorAll(".mui-form-group")];
     const g=groups.find(x=>/快捷编辑/.test(x.innerText||"") && /已上传/.test(x.innerText||""));
@@ -341,7 +341,7 @@ async function replaceDetail(files) {
     if(d){await page.mouse.click(d.x,d.y); await page.waitForTimeout(800);}
   }
   st=await detailState(); log("detail_final",JSON.stringify(st));
-  if (st.imgs < Math.max(MIN_DETAIL, files.length)) throw new Error("detail_upload_incomplete:" + st.imgs);
+  if (st.imgs < files.length) throw new Error("detail_upload_incomplete:" + st.imgs);
   return {after:st, uploaded:files.length};
 }
 async function collectSkuCodes() {
