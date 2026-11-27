@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { resolveLedgerRoot, assertCan, recordResult } from "./product-ledger.mjs";
+import { resolveLedgerRoot, assertCan, recordResult, acquireLock, releaseLock } from "./product-ledger.mjs";
 
 const CFG_PATH = process.argv[2];
 if (!CFG_PATH) { console.error("用法: node run.mjs edit-config.json"); process.exit(2); }
@@ -84,10 +84,22 @@ async function recordEdit(r) {
 }
 const done = [];
 for (let i = 0; i < shops.length; i++) {
-  const r = await runOne(shops[i], i);
-  done.push(r);
-  try { await recordEdit(r); } catch (e) { console.error("RECORD_FAILED " + (e && e.message || e)); }
-  console.log("DONE " + r.shop + " goodsId=" + r.goodsId + " status=" + (r.result.status || "?") + " changed=" + ((r.result.changed && r.result.changed.length) || 0) + " wall=" + r.wallSec + "s" + (r.result.error ? " err=" + r.result.error : ""));
+  const goodsId = String(shops[i].goodsId || CFG.goodsId || "");
+  const lock = goodsId ? await acquireLock({ root: LEDGER_ROOT, shop: shops[i].shop, goodsId }) : null;
+  if (lock && !lock.ok) {
+    const result = { status: "failed", error: "product_locked:" + goodsId };
+    done.push({ shop: shops[i].shop, goodsId, result, wallSec: 0 });
+    console.log("DONE " + shops[i].shop + " goodsId=" + goodsId + " status=failed err=" + result.error);
+    continue;
+  }
+  try {
+    const r = await runOne(shops[i], i);
+    done.push(r);
+    try { await recordEdit(r); } catch (e) { console.error("RECORD_FAILED " + (e && e.message || e)); }
+    console.log("DONE " + r.shop + " goodsId=" + r.goodsId + " status=" + (r.result.status || "?") + " changed=" + ((r.result.changed && r.result.changed.length) || 0) + " wall=" + r.wallSec + "s" + (r.result.error ? " err=" + r.result.error : ""));
+  } finally {
+    if (lock && lock.ok) await releaseLock(lock);
+  }
 }
 const report = { runId: RUN_ID, saveMode, pricePercent, stockSet, recordRoot: RECORD_ROOT, stores: done.map((d) => ({ shop: d.shop, goodsId: d.goodsId, wallSec: d.wallSec, ...d.result })) };
 await fs.writeFile(path.join(RUN_DIR, "report.json"), JSON.stringify(report, null, 1), "utf8");
