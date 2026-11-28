@@ -32,7 +32,9 @@ if (!LEDGER_ROOT) addIssue("ledger_root_required", "首次使用请指定运营�
 
 if (!shops.length) addIssue("shops_missing", "config 需要 shops");
 if (!["fill", "draft", "submit"].includes(saveMode)) addIssue("saveMode_invalid", "saveMode 只能是 fill/draft/submit");
-if (pricePercent === null && stockSet === null && !Array.isArray(images.carousel) && !Array.isArray(images.detail) && !Array.isArray(images.sku)) addIssue("action_missing", "需要 pricePercent/stockSet 或 images.carousel/detail");
+const hasImages = Array.isArray(images.carousel) || Array.isArray(images.detail) || Array.isArray(images.sku) || (typeof images.skuAll === "string" && images.skuAll);
+if (pricePercent === null && stockSet === null && !hasImages) addIssue("action_missing", "需要 pricePercent/stockSet 或 images.carousel/detail/skuAll");
+if (hasImages && saveMode !== "fill" && CFG.confirmSaveImages !== true) addIssue("save_images_not_confirmed", "saveMode 会保存已替换图片；如确认，设 confirmSaveImages:true");
 if ((pricePercent !== null && !Number.isFinite(pricePercent)) || (stockSet !== null && !Number.isFinite(stockSet))) addIssue("value_invalid", "pricePercent/stockSet 必须是数字");
 if (saveMode === "submit" && CFG.confirmSubmit !== true) addIssue("submit_not_confirmed", "submit 生效需显式 confirmSubmit:true；先用 fill 检查");
 if (!shops.some((s) => s.goodsId || CFG.goodsId)) addIssue("goods_missing", "需要 goodsId（全局或每个 shop）");

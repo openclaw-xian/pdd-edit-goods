@@ -51,7 +51,7 @@ description: 拼多多多店铺「商品编辑」：在商品编辑页批量换�
 - `carousel`：自动删到 0 → 上传新图；第一张即新首图
 - `detail`：自动留 1 张 → 上传新版 → 删开头旧图
 - `sku`：按规格编码匹配行 → 删旧预览 → 行内 input 上传
-- 图片默认不保存；saveMode 仍控制价格/库存的保存
+- `saveMode:draft/submit` 是整页保存，**包含已替换的图片**；换图+改价先 `fill` 检查，保存时必须显式 `confirmSaveImages:true`。
 
 ### 轮播图（10 slot）
 

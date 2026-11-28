@@ -1,3 +1,9 @@
+## 0.3.21 — 2026-11-28
+
+- B1：`saveMode:draft/submit` 会保存图片；新增 `confirmSaveImages:true` 硬门，未确认直接 `save_images_not_confirmed`。
+- B4：`images.skuAll` 加入预检，不再误报 action_missing；文档补 skuAll。
+- 文档不再写“图片默认不保存”。
+
 ## 0.3.20 — 2026-11-27
 
 - 脱敏：真实店铺名/商品 ID 改为 `<店铺>`/`<商品ID>`。
