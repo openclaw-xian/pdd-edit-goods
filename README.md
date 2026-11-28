@@ -57,3 +57,5 @@ node run.mjs edit-config.json
 ## 共享账本配置
 
 首次指定 `ledgerRoot` 后会写入共享配置（默认 `%USERPROFILE%/.config/pdd/ledger.json`，可用 `PDD_LEDGER_CONFIG` 覆盖）。其他 skill 自动读取，不再重复询问；配置里只存目录指针，不存业务数据。
+
+- `images.skuAll`：用一张图统一替换全部 SKU 预览图。
