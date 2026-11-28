@@ -206,3 +206,12 @@ md 表：规格编码 / 原库存 / 改后库存 / 原拼单价 / 改后拼单�
 - 退出码：0 完成/预览；3 预检；4 needs；5 失败。
 
 - `images.skuAll`：用一张图统一替换全部 SKU 预览图。
+
+## 多店铺约定
+
+- 一个 `profile` 只对应一个店铺，`profile` 是唯一身份。
+- `shop` 只用于展示和账本/产物目录，不用于定位登录态。
+- 配置必须显式给 `{ shop, profile }`，不按店铺名猜 profile。
+- 登录、space、操作都按 profile 隔离。
+- profile 缺失/失效 → `shop_not_logged_in` / `login_required`，不自动映射。
+- 账本/产物路径按 shop 分：`<root>/<shop>/...`。
