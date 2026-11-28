@@ -133,7 +133,7 @@ node <skill目录>/run.mjs edit-config.json
 - `draft`：点「保存草稿」
 - `submit`：点底部「提交」；成功后 URL 为 `goods_add/success?...&wait_audit=false`
 - 提交线上会生效；恢复原值要用原值清单再填一次并提交，不能只靠百分比反推
-- 换图默认不保存；用户要求保存时再显式执行
+- 换图默认不保存；`saveMode:draft/submit` 会保存图片，必须 `confirmSaveImages:true`；用户要求保存时再显式执行
 
 ## 输出
 
