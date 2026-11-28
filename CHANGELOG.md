@@ -1,3 +1,7 @@
+## 0.3.22 — 2026-11-28
+
+- 文档补批量方式与退出码 0/3/4/5。
+
 ## 0.3.21 — 2026-11-28
 
 - B1：`saveMode:draft/submit` 会保存图片；新增 `confirmSaveImages:true` 硬门，未确认直接 `save_images_not_confirmed`。
